@@ -5,7 +5,7 @@
   
     "description": "Adds a red border to all webpages matching mozilla.org.",
 
-    "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage"],
+    "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage", "downloads"],
 
     "background": {
       "scripts": ["background.js"]
@@ -17,9 +17,8 @@
   
     "content_scripts": [
       {
-        
         "matches": ["*://*.facebook.com/*"],
-        "js": ["troll-patrol.js", "background.js"]
+        "js": ["troll-patrol.js", "content.js"]
       }
     ]
   }
