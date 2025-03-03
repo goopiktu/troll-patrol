@@ -4,16 +4,21 @@
     "version": "1.0",
   
     "description": "Adds a red border to all webpages matching mozilla.org.",
-  
+
+    "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage", "downloads"],
+
+    "background": {
+      "scripts": ["background.js"]
+    },
+
     "icons": {
       "48": "icons/border-48.png"
     },
   
     "content_scripts": [
       {
-        
         "matches": ["*://*.facebook.com/*"],
-        "js": ["troll-patrol.js"]
+        "js": ["troll-patrol.js", "content.js"]
       }
     ]
   }
