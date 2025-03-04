@@ -1,12 +1,5 @@
-// MIT License Copyright © 2012-2015 Karan Lyons, Sascha Droste 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
-// to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-// and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-import { v3 as MurmurHash3 } from 'murmurhash-js';
+class BloomFilter {
 
-class BloomFilter { 
-    
     // Creates a Bloom filter with the variables m and k.
     // m can either be an array-like object with a length
     // or m can be the number of bits of the created Bloom filter.
@@ -15,72 +8,81 @@ class BloomFilter {
     // k = number of hashing functions
     // buckets = stores filter bits in 32 bit array
     // indexes = stores hashed results during insertion
-    constructor(m, k) { 
-        let a; 
-        if (typeof m !== "number") { 
-            a = m; m = a.length * 32; 
+    constructor(m, k) {
+        let a;
+        if (typeof m !== "number") {
+            a = m; m = a.length * 32;
         }
         const n = Math.ceil(m / 32);
-        let i = -1;
         this.m = n * 32;
         this.k = k;
         this.buckets = new Int32Array(n);
         if (a) {
-            while (++i < n) {
+            for (let i = 0; i < n; i++) {
                 this.buckets[i] = a[i];
             }
         }
         this.indexes = new Uint32Array(new ArrayBuffer(4 * k));
     }
 
+    // Fowler–Noll–Vo hash function
+    // FNV_OFFSET_BASIS = which is the initial hash value
+    // FNV_prime = prime number used in the hashing process.
+    // Returns value for indexing in Bloom filter.
+    fnv1aHash(value) {
+        const FNV_OFFSET_BASIS = 0xCBF29CE484222325n;
+        const FNV_prime = 0x100000001B3n;
+        let hash = FNV_OFFSET_BASIS;
+        for (let i = 0; i < value.length; i++) {
+            hash ^= BigInt(value.charCodeAt(i));
+            hash *= FNV_prime;
+        }
+        return hash;
+    }
+
+    // The function first retrieves the indexes array from the Bloom filter instance. 
+    // It then computes two hash values using the fnv1aHash function.
+    // k = number of hash functions (or indices)
+    // r  = computed indices. Indices for setting or checking bits in the Bloom filter.
     locations(v) {
-        var k = this.k;
-        var m = this.m;
-        var r = this.indexes
-        var a = MurmurHash3(v);
-        var b = MurmurHash3(v,2369007371); // Randomly chosen seed from 32 bit integer
-        var x = a % m;
-        for (var i = 0; i < k; i++) {
-            r[i] = x < 0 ? (x+m) : x;
-            x = (x+b) % m;
+        const r = this.indexes;
+        const hash1 = this.fnv1aHash(v);
+        const hash2 = this.fnv1aHash(v + "salt");
+        for (let i = 0; i < this.k; i++) {
+            r[i] = Number((hash1 + BigInt(i) * hash2) % BigInt(this.m));
         }
         return r;
     }
 
     add(v) {
-        var l = this.locations(v + ""),
-            k = this.k,
-            buckets = this.buckets;
-        for (var i = 0; i < k; ++i) {
-            buckets[Math.floor(l[i] / 32)] |= 1 << (l[i] % 32);
+        const l = this.locations(v + "");
+        for (let i = 0; i < this.k; i++) {
+            this.buckets[Math.floor(l[i] / 32)] |= 1 << (l[i] % 32);
         }
     }
 
     check(v) {
-        var l = this.locations(v + "");
-        var k = this.k;
-        var buckets = this.buckets;
-        for (var i = 0; i < k; ++i) {
-          var b = l[i];
-          if ((buckets[Math.floor(b / 32)] & (1 << (b % 32))) === 0) {
-            return false;
-          }
+        const l = this.locations(v + "");
+        for (let i = 0; i < this.k; i++) {
+            const b = l[i];
+            if ((this.buckets[Math.floor(b / 32)] & (1 << (b % 32))) === 0) {
+                return false;
+            }
         }
         return true;
-      };
-    
+    }
+
     // The total number of set bits obtained from countSetBits() is used in the formula 
-    // to estimate how many unique elements have been added to the Bloom filter. 
-    // The more bits that are set, the higher the estimated cardinality.
-    size(){
-        var buckets = this.buckets;
-        var bits = 0;
-        for (var i = 0, n = buckets.length; i < n; ++i) {
-            bits += countSetBits(buckets[i]);
+    // to estimate how many unique elements have been added to the Bloom filter.
+    // The more bits that are set, the higher the number of elements in the set.
+    size() {
+        let bits = 0;
+        for (let i = 0; i < this.buckets.length; i++) {
+            bits += this.countSetBits(this.buckets[i]);
         }
         return -this.m * Math.log(1 - bits / this.m) / this.k;
     }
-    
+
     // This method is used to count the number of bits that are set to 1 in each bucket of the Bloom filter.
     // This count is crucial for estimating the number of elements in the set.
     countSetBits(n) {
@@ -91,25 +93,21 @@ class BloomFilter {
         n = n + (n >> 16);
         return n & 0x3F;
     }
-}
 
-// Call this class when importing from DB
-class CombinedBloomFilter {
-    constructor(name) {
-        this.name = name;
-        this.parts = [];
+    async save(key) {
+        const data = JSON.stringify(Array.from(this.buckets));
+        await browser.storage.local.set({ [key]: data });
+        console.log(`Saved to local storage: ${key}`);
     }
-
-    static getIdForPart(v, i) {
-        return i === 0 ? v : v + '|' + i;
-    }
-
-    check(v) {
-        for (let i = 0; i < this.parts.length; i++) {
-            const part = this.parts[i];
-            const id = CombinedBloomFilter.getIdForPart(v, i);
-            if (part.test(id)) return true;
+    
+    async load(key) {
+        const result = await browser.storage.local.get(key);
+        if (result[key]) {
+            const parsedData = JSON.parse(result[key]);
+            this.buckets = new Int32Array(parsedData);
+            console.log(`Loaded from local storage: ${key}`);
+        } else {
+            console.log(`No data found for key: ${key}`);
         }
-        return false;
     }
 }
