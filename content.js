@@ -34,48 +34,41 @@ function extractFacebookProfileID(url) {
     return usernameMatch ? usernameMatch[1] : null;
 }
 
-
-// Function to highlight reported users
 function highlightReportedUsers() {
-    browser.storage.local.get("reportedCommenters").then((result) => {
-        let reportedUsers = result.reportedCommenters || [];
+    if (!window.bloomFilter) {
+        console.warn("Bloom Filter not initialized.");
+        return;
+    }
 
-        // Select all Facebook comments
-        document.querySelectorAll("div[role='article']").forEach((comment) => {
-            let nameElement = comment.querySelector("span.x193iq5w"); // Select name element
-            
-            let profileLink = comment.querySelector("a[href*='facebook.com/']");
-            if (!profileLink) return;
+    document.querySelectorAll("div[role='article']").forEach((comment) => {
+        let nameElement = comment.querySelector("span.x193iq5w"); // Name element
+        let profileLink = comment.querySelector("a[href*='facebook.com/']");
+        if (!profileLink) return;
 
-            let commenterProfile = extractFacebookProfileID(profileLink.getAttribute("href"));
-            if (!commenterProfile) return;
+        let commenterProfile = extractFacebookProfileID(profileLink.getAttribute("href"));
+        if (!commenterProfile) return;
 
-            // Check if the commenter is in the reported users list
-            let reported = reportedUsers.find(user => user.profile_ID === commenterProfile);
+        if (window.bloomFilter.check(commenterProfile)) {
+            comment.style.border = "2px solid red";
+            comment.style.borderRadius = "5px";
 
-            if (reported) {
-                // Apply red highlight
-                comment.style.border = "2px solid red";
-                comment.style.borderRadius = "5px";
-                
-                // Add a "Potential Troll" label
-                if (!comment.querySelector(".troll-label")) {
-                    let label = document.createElement("span");
-                    label.classList.add("troll-label");
-                    label.textContent = "⚠️ Potential Troll";
-                    label.style.color = "red";
-                    label.style.fontWeight = "bold";
-                    label.style.marginLeft = "10px";
-                    nameElement.appendChild(label);
-                }
+            if (!comment.querySelector(".troll-label")) {
+                let label = document.createElement("span");
+                label.classList.add("troll-label");
+                label.textContent = "⚠️ Potential Troll";
+                label.style.color = "red";
+                label.style.fontWeight = "bold";
+                label.style.marginLeft = "10px";
+                nameElement.appendChild(label);
             }
-        });
+        }
     });
 }
 
-// Run the function on page load
+// Run on page load
 highlightReportedUsers();
 
-// Observe the DOM for dynamically loaded comments (Facebook loads comments asynchronously)
+// Observe for dynamically loaded comments
 const observer = new MutationObserver(() => highlightReportedUsers());
 observer.observe(document.body, { childList: true, subtree: true });
+

@@ -18,7 +18,7 @@
     "content_scripts": [
       {
         "matches": ["*://*.facebook.com/*"],
-        "js": ["bloomfilter.js", "troll-patrol.js", "content.js"]
+        "js": ["bloomfilter.js", "initialize-bloomfilter.js", "troll-patrol.js", "content.js"]
       }
     ]
   }
