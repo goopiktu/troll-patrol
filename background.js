@@ -4,8 +4,7 @@ let lastCommenter = null;
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "storeCommenter") {
         lastCommenter = {
-            name: message.commenter,
-            profile: message.profileURL
+            profile_ID: message.profile_ID // Store only the profile ID
         };
     } else if (message.type === "getCommenter") {
         sendResponse(lastCommenter);

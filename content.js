@@ -2,25 +2,37 @@ document.addEventListener("contextmenu", (event) => {
     let commentElement = event.target.closest("div[role='article']");
     
     if (commentElement) {
-        let spanElement = commentElement.querySelector("span.x193iq5w");
         let profileLink = commentElement.querySelector("a[href*='facebook.com/']");
 
-        if (spanElement && profileLink) {
-            let commenterName = spanElement.innerText;
+        if (profileLink) {
             let commenterProfile = profileLink.getAttribute("href");
 
-            console.log("Right-clicked Commenter:", commenterName, "Profile:", commenterProfile);
-            
-            // Send data to background.js
-            browser.runtime.sendMessage({
-                type: "storeCommenter",
-                commenter: commenterName,
-                profileURL: commenterProfile
-            });
+            // Extract the user ID or username
+            commenterProfile = extractFacebookProfileID(commenterProfile);
+
+            if (commenterProfile) {
+                console.log("Right-clicked Commenter ID:", commenterProfile);
+                
+                // Send data to background.js
+                browser.runtime.sendMessage({
+                    type: "storeCommenter",
+                    profile_ID: commenterProfile
+                });
+            }
         }
     }
 });
 
+// Function to extract Facebook Profile ID or Username
+function extractFacebookProfileID(url) {
+    // Handle profile ID format: facebook.com/profile.php?id=123456789
+    let idMatch = url.match(/profile\.php\?id=(\d+)/);
+    if (idMatch) return idMatch[1];
+
+    // Handle username format: facebook.com/username
+    let usernameMatch = url.match(/facebook\.com\/([^/?]+)/);
+    return usernameMatch ? usernameMatch[1] : null;
+}
 
 
 // Function to highlight reported users
@@ -31,12 +43,15 @@ function highlightReportedUsers() {
         // Select all Facebook comments
         document.querySelectorAll("div[role='article']").forEach((comment) => {
             let nameElement = comment.querySelector("span.x193iq5w"); // Select name element
-            if (!nameElement) return;
+            
+            let profileLink = comment.querySelector("a[href*='facebook.com/']");
+            if (!profileLink) return;
 
-            let commenterName = nameElement.textContent.trim();
+            let commenterProfile = extractFacebookProfileID(profileLink.getAttribute("href"));
+            if (!commenterProfile) return;
 
             // Check if the commenter is in the reported users list
-            let reported = reportedUsers.find(user => user.name === commenterName);
+            let reported = reportedUsers.find(user => user.profile_ID === commenterProfile);
 
             if (reported) {
                 // Apply red highlight
