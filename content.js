@@ -40,6 +40,27 @@ function highlightReportedUsers() {
         return;
     }
 
+    document.querySelectorAll("div[role='article']").forEach((post) => {
+        let posterName = post.querySelector("span.x193iq5w");
+        let posterLink = post.querySelector("a[href*='facebook.com/']");
+        if (posterLink) {
+            let posterProfile = extractFacebookProfileID(posterLink.getAttribute("href"));
+            if (posterProfile && window.bloomFilter.check(posterProfile)) {
+                post.style.border = "2px solid red";
+                post.style.borderRadius = "5px";
+                if (!posterName.querySelector(".troll-label")) {
+                    let label = document.createElement("span");
+                    label.classList.add("troll-label");
+                    label.textContent = "⚠️ Potential Troll";
+                    label.style.color = "red";
+                    label.style.fontWeight = "bold";
+                    label.style.marginLeft = "10px";
+                    posterName.appendChild(label);
+                }
+            }
+        }
+    });
+
     document.querySelectorAll("div[role='article']").forEach((comment) => {
         let nameElement = comment.querySelector("span.x193iq5w"); // Name element
         let profileLink = comment.querySelector("a[href*='facebook.com/']");
@@ -71,4 +92,3 @@ highlightReportedUsers();
 // Observe for dynamically loaded comments
 const observer = new MutationObserver(() => highlightReportedUsers());
 observer.observe(document.body, { childList: true, subtree: true });
-
