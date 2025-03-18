@@ -94,20 +94,114 @@ class BloomFilter {
         return n & 0x3F;
     }
 
-    async save(key) {
-        const data = JSON.stringify(Array.from(this.buckets));
-        await browser.storage.local.set({ [key]: data });
-        console.log(`Saved to local storage: ${key}`);
+    async save(key, version) {
+        const data = {
+            version: version,
+            reportedUsers: Array.from(this.buckets)
+        };
+        await browser.storage.local.set({ [key]: JSON.stringify(data) });
+        const verification = await this.load(key);
+        if (!verification || verification.version !== version) {
+            console.error('Failed to save data correctly.');
+        } else {
+            console.log('Data saved and verified successfully.');
+        }
     }
     
     async load(key) {
         const result = await browser.storage.local.get(key);
         if (result[key]) {
             const parsedData = JSON.parse(result[key]);
-            this.buckets = new Int32Array(parsedData);
-            console.log(`Loaded from local storage: ${key}`);
+            this.buckets = new Int32Array(parsedData.reportedUsers);
+            this.m = this.buckets.length * 32;
+            const version = parsedData.version;
+            console.log(`Loaded from local storage: ${key} with version: ${version}`);
+            return { version };
         } else {
             console.log(`No data found for key: ${key}`);
+            return null;
         }
+    }
+
+    // Combines two arrays of buckets by performing a bitwise OR operation on corresponding elements
+    // It first checks if the sizes of the two arrays match; if not, it logs an error and exits. 
+    // If the sizes are the same, it updates the current buckets with the merged values and logs a success message.
+    merge(newBuckets) {
+        if (newBuckets.length !== this.buckets.length) {
+            console.error('Bucket size mismatch. Cannot merge filters.');
+            return;
+        }
+        for (let i = 0; i < this.buckets.length; i++) {
+            this.buckets[i] |= newBuckets[i];
+        }
+        console.log('Merge successful.');
+    }
+
+    async fetchFromGitHub(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error, status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    }
+
+    // This method asynchronously updates local reported user data by fetching it from a 
+    // specified GitHub URL and comparing its version with the local version.
+    // If the remote data is valid and has a newer version, 
+    // it merges the remote buckets into the local buckets.
+    // If their sizes differ, buckets are reinitialized.
+    async updateFromGitHub(url) {
+        const localData = await this.load('reportedUsers');
+        const localVersion = localData ? localData.version : 0;
+        const remoteData = await this.fetchFromGitHub(url);
+        if (!remoteData?.reportedUsers) {
+            console.log('No valid remote data found.');
+            return;
+        }
+        let parsedData;
+        try {
+            parsedData = JSON.parse(remoteData.reportedUsers);
+        } catch (error) {
+            console.error('Error parsing reportedUsers JSON:', error);
+            return;
+        }
+        if (!parsedData?.version || !parsedData?.reportedUsers) {
+            console.log('Invalid data structure after parsing.');
+            return;
+        }
+        const remoteVersion = parsedData.version;
+        if (remoteVersion > localVersion) {
+            console.log(`Merging from version ${localVersion} to ${remoteVersion}`);
+            const remoteBuckets = new Int32Array(parsedData.reportedUsers);
+    
+            if (remoteBuckets.length !== this.buckets.length) {
+                console.warn('Reinitializing buckets due to size mismatch.');
+                this.buckets = new Int32Array(remoteBuckets.length);
+            }
+            this.merge(remoteBuckets);
+            await this.save('reportedUsers', remoteVersion);
+        } else {
+            console.log('Local data is up-to-date. No merge needed.');
+        }
+    }
+    
+    // This function gets the current version of the Bloom filter.
+    static async getVersion(key) {
+        const result = await browser.storage.local.get(key);
+        if (result[key]) {
+            try {
+                const parsedData = JSON.parse(result[key]);
+                return parsedData.version || 0;
+            } catch (e) {
+                console.error('Error parsing stored data:', e);
+                return 0;
+            }
+        }
+        return 0;
     }
 }
