@@ -23,6 +23,7 @@ document.addEventListener("contextmenu", (event) => {
     }
 });
 
+
 // Function to extract Facebook Profile ID or Username
 function extractFacebookProfileID(url) {
     // Handle profile ID format: facebook.com/profile.php?id=123456789
@@ -40,55 +41,51 @@ function highlightReportedUsers() {
         return;
     }
 
-    document.querySelectorAll("div[role='article']").forEach((post) => {
-        let posterName = post.querySelector("span.x193iq5w");
-        let posterLink = post.querySelector("a[href*='facebook.com/']");
-        if (posterLink) {
-            let posterProfile = extractFacebookProfileID(posterLink.getAttribute("href"));
-            if (posterProfile && window.bloomFilter.check(posterProfile)) {
-                post.style.border = "2px solid red";
-                post.style.borderRadius = "5px";
-                if (!posterName.querySelector(".troll-label")) {
-                    let label = document.createElement("span");
-                    label.classList.add("troll-label");
-                    label.textContent = "⚠️ Potential Troll";
-                    label.style.color = "red";
-                    label.style.fontWeight = "bold";
-                    label.style.marginLeft = "10px";
-                    posterName.appendChild(label);
-                }
-            }
-        }
-    });
-
+    // A bit delayed
     document.querySelectorAll("div[role='article']").forEach((comment) => {
         let nameElement = comment.querySelector("span.x193iq5w"); // Name element
         let profileLink = comment.querySelector("a[href*='facebook.com/']");
         if (!profileLink) return;
-
+    
         let commenterProfile = extractFacebookProfileID(profileLink.getAttribute("href"));
         if (!commenterProfile) return;
-
+    
         if (window.bloomFilter.check(commenterProfile)) {
-            comment.style.border = "2px solid red";
-            comment.style.borderRadius = "5px";
-
+            // Add blur effect
+            comment.style.filter = "blur(5px)";
+            comment.style.transition = "filter 0.3s ease";
+    
+            // Optional styling to make it clear it's blurred
+            comment.style.position = "relative";
+    
+            // Add a warning label (like before)
             if (!comment.querySelector(".troll-label")) {
                 let label = document.createElement("span");
                 label.classList.add("troll-label");
-                label.textContent = "⚠️ Potential Troll";
-                label.style.color = "red";
+                label.textContent = "Potential Troll";
                 label.style.fontWeight = "bold";
                 label.style.marginLeft = "10px";
                 nameElement.appendChild(label);
             }
+    
+            // Toggle blur on click
+            comment.addEventListener("click", function (e) {
+                // Prevent triggering other click events inside
+                e.stopPropagation();
+    
+                if (comment.style.filter === "blur(5px)") {
+                    comment.style.filter = "none";
+                } else {
+                    comment.style.filter = "blur(5px)";
+                }
+            });
         }
     });
+    
 }
 
 // Run on page load
 highlightReportedUsers();
-
 // Observe for dynamically loaded comments
 const observer = new MutationObserver(() => highlightReportedUsers());
 observer.observe(document.body, { childList: true, subtree: true });
