@@ -1,91 +1,149 @@
 document.addEventListener("contextmenu", (event) => {
-    let commentElement = event.target.closest("div[role='article']");
-    
-    if (commentElement) {
-        let profileLink = commentElement.querySelector("a[href*='facebook.com/']");
+    let profileLinkElement = event.target.closest("a[href*='facebook.com/']");
 
-        if (profileLink) {
-            let commenterProfile = profileLink.getAttribute("href");
+    if (profileLinkElement) {
+        let profileHref = profileLinkElement.getAttribute("href");
+        let profileID = extractFacebookProfileID(profileHref);
+        let displayName = profileLinkElement.innerText || profileLinkElement.textContent;
 
-            // Extract the user ID or username
-            commenterProfile = extractFacebookProfileID(commenterProfile);
+        console.log("Right-clicked Profile ID:", profileID);
+        console.log("Display Name:", displayName);
 
-            if (commenterProfile) {
-                console.log("Right-clicked Commenter ID:", commenterProfile);
-                
-                // Send data to background.js
-                browser.runtime.sendMessage({
-                    type: "storeCommenter",
-                    profile_ID: commenterProfile
-                });
-            }
+        if (profileID) {
+            browser.runtime.sendMessage({
+                type: "storeCommenter",
+                profile_ID: profileID,
+                display_name: displayName
+            });
         }
     }
 });
 
+// Depth-based ancestor finder
+function getFurthestAncestor(element, depth = Infinity) {
+    let ancestor = element;
+    let currentDepth = 0;
+
+    while (ancestor.parentElement && currentDepth < depth) {
+        ancestor = ancestor.parentElement;
+        currentDepth++;
+    }
+
+    return ancestor;
+}
 
 // Function to extract Facebook Profile ID or Username
 function extractFacebookProfileID(url) {
-    // Handle profile ID format: facebook.com/profile.php?id=123456789
     let idMatch = url.match(/profile\.php\?id=(\d+)/);
     if (idMatch) return idMatch[1];
 
-    // Handle username format: facebook.com/username
     let usernameMatch = url.match(/facebook\.com\/([^/?]+)/);
     return usernameMatch ? usernameMatch[1] : null;
 }
 
+// Main function to blur reported users
 function highlightReportedUsers() {
     if (!window.bloomFilter) {
         console.warn("Bloom Filter not initialized.");
         return;
     }
 
-    // A bit delayed
+    // Process posts/comments
     document.querySelectorAll("div[role='article']").forEach((comment) => {
-        let nameElement = comment.querySelector("span.x193iq5w"); // Name element
+        let nameElement = comment.querySelector("span.x193iq5w");
         let profileLink = comment.querySelector("a[href*='facebook.com/']");
+
         if (!profileLink) return;
-    
-        let commenterProfile = extractFacebookProfileID(profileLink.getAttribute("href"));
+
+        let profileHref = profileLink.getAttribute("href");
+        if (!profileHref) return;
+
+        let commenterProfile = extractFacebookProfileID(profileHref);
         if (!commenterProfile) return;
-    
+
         if (window.bloomFilter.check(commenterProfile)) {
-            // Add blur effect
-            comment.style.filter = "blur(5px)";
-            comment.style.transition = "filter 0.3s ease";
-    
-            // Optional styling to make it clear it's blurred
-            comment.style.position = "relative";
-    
-            // Add a warning label (like before)
-            if (!comment.querySelector(".troll-label")) {
-                let label = document.createElement("span");
-                label.classList.add("troll-label");
-                label.textContent = "Potential Troll";
-                label.style.fontWeight = "bold";
-                label.style.marginLeft = "10px";
-                nameElement.appendChild(label);
-            }
-    
-            // Toggle blur on click
-            comment.addEventListener("click", function (e) {
-                // Prevent triggering other click events inside
-                e.stopPropagation();
-    
-                if (comment.style.filter === "blur(5px)") {
-                    comment.style.filter = "none";
+            if (!comment.classList.contains("blurred")) {
+                console.log("Blurring comment by reported user:", commenterProfile);
+
+                if (nameElement !== null) {
+                    blurContainer(comment, nameElement, nameElement.innerText || "Unknown User");
                 } else {
-                    comment.style.filter = "blur(5px)";
+                    let postAncestor = getFurthestAncestor(profileLink, 15);
+                    if (postAncestor) {
+                        blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster");
+                    }
                 }
-            });
+            }
         }
     });
-    
+
+    // Process profile name elements (e.g. ads, posts)
+    document.querySelectorAll('[data-ad-rendering-role="profile_name"]').forEach((element) => {
+        const displayName = element.innerText || element.textContent;
+        const linkElement = element.querySelector('a');
+        const href = linkElement ? linkElement.href : null;
+
+        if (!href) return;
+
+        let profileID = extractFacebookProfileID(href);
+        if (!profileID) return;
+
+        if (window.bloomFilter.check(profileID)) {
+            let ancestor = getFurthestAncestor(element, 15);
+            if (ancestor && !ancestor.classList.contains("blurred")) {
+                console.log("Blurring profile post by reported user:", profileID);
+                blurContainer(ancestor, element, displayName);
+            }
+        }
+    });
 }
 
-// Run on page load
-highlightReportedUsers();
-// Observe for dynamically loaded comments
-const observer = new MutationObserver(() => highlightReportedUsers());
+// Blur handler
+function blurContainer(container, nameElement, displayName) {
+    // Prevent re-processing
+    if (container.classList.contains("blurred")) return;
+
+    container.classList.add("blurred");
+
+    // Add warning label if it doesn't already exist
+    if (!nameElement.querySelector(".troll-label")) {
+        let label = document.createElement("span");
+        label.className = "troll-label";
+        label.textContent = "⚠️ Reported";
+        nameElement.appendChild(label);
+    }
+
+    // Toggle blur on click
+    container.addEventListener("click", function (e) {
+        e.stopPropagation();
+        container.classList.toggle("blurred");
+    }, { once: true });
+}
+
+// Throttle utility
+function throttle(fn, wait) {
+    let timer = null;
+    return function (...args) {
+        if (timer) return;
+        timer = setTimeout(() => {
+            fn.apply(this, args);
+            timer = null;
+        }, wait);
+    };
+}
+
+// Schedule highlight function
+const scheduleHighlight = throttle(() => {
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(highlightReportedUsers);
+    } else {
+        highlightReportedUsers();
+    }
+}, 200); // Throttle interval (ms)
+
+// Observe for dynamically loaded content
+const observer = new MutationObserver(() => scheduleHighlight());
 observer.observe(document.body, { childList: true, subtree: true });
+
+// Initial run on page load
+highlightReportedUsers();
