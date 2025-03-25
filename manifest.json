@@ -5,7 +5,7 @@
   
     "description": "Adds a red border to all webpages matching mozilla.org.",
 
-    "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage", "downloads", "https://raw.githubusercontent.com/*"],
+    "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage", "downloads", "https://raw.githubusercontent.com/*", "https://trollpatrolapi.vercel.app/api/reports"],
 
     "background": {
       "scripts": ["background.js"]

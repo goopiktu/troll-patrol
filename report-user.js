@@ -20,7 +20,7 @@ browser.runtime.sendMessage({ type: "getCommenter" }).then(async (response) => {
         alert("User added to reports.");
 
         // Hash the ID
-        const hashedID = window.bloomFilter.fnv1aHash(response.profile_ID);
+        const hashedID = window.bloomFilter.fnv1aHash(response.profile_ID).toString();
 
         // Prepare the load to send
         const load = {
@@ -28,8 +28,7 @@ browser.runtime.sendMessage({ type: "getCommenter" }).then(async (response) => {
         };
 
         try {
-            // Example: Sending the report to your server (Replace the URL with your actual endpoint)
-            const res = await fetch('the link?', {
+            const res = await fetch('https://trollpatrolapi.vercel.app/api/reports', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
