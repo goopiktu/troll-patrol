@@ -100,24 +100,44 @@ function highlightReportedUsers() {
 
 // Blur handler
 function blurContainer(container, nameElement, displayName) {
-    // Prevent re-processing
-    if (container.classList.contains("blurred")) return;
+    // Prevent re-processing if already blurred
+    if (container.classList.contains("blurred") || container.querySelector(".troll-blur-wrapper")) return;
+
+    // Skip blur if the user has unblurred it before
+    if (sessionStorage.getItem(`unblurred-${displayName}`) === "true") return;
 
     container.classList.add("blurred");
+    container.style.position = "relative"; // Ensure correct positioning
 
-    // Add warning label if it doesn't already exist
-    if (!nameElement.querySelector(".troll-label")) {
-        let label = document.createElement("span");
-        label.className = "troll-label";
-        label.textContent = "⚠️ Reported";
-        nameElement.appendChild(label);
+    // Create the blur wrapper (only if not already added)
+    let blurWrapper = document.createElement("div");
+    blurWrapper.className = "troll-blur-wrapper";
+
+    // Move all children into the blur wrapper
+    while (container.firstChild) {
+        blurWrapper.appendChild(container.firstChild);
     }
+    container.appendChild(blurWrapper);
 
-    // Toggle blur on click
-    container.addEventListener("click", function (e) {
+    // Create the overlay
+    let overlay = document.createElement("div");
+    overlay.className = "troll-overlay";
+    overlay.innerHTML = `<div class="troll-overlay-content">
+                            <span class="troll-label">This Comment might be a Troll</span>
+                            <span class="troll-labal-2">Do you still wish to view?</span>
+                            <button class="troll-unblur-btn">Show</button>
+                         </div>`;
+
+    container.appendChild(overlay);
+
+    // Handle unblur button click
+    overlay.querySelector(".troll-unblur-btn").addEventListener("click", function (e) {
         e.stopPropagation();
-        container.classList.toggle("blurred");
-    }, { once: true });
+        container.classList.remove("blurred"); // Remove blur class
+        blurWrapper.style.filter = "none"; // Remove blur effect
+        overlay.remove(); // Remove the overlay
+        sessionStorage.setItem(`unblurred-${displayName}`, "true"); // Save unblur state
+    });
 }
 
 // Throttle utility

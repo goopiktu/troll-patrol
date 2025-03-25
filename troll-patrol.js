@@ -1,4 +1,4 @@
-document.body.style.border = "5px solid red";
+// document.body.style.border = "5px solid red";
 
 const bloomFilter = new BloomFilter(492320, 5);
 window.bloomFilter = bloomFilter;
