@@ -157,27 +157,18 @@ class BloomFilter {
     // If their sizes differ, buckets are reinitialized.
     async updateFromGitHub(url) {
         const localData = await this.load('reportedUsers');
-        const localVersion = localData ? localData.version : 0;
+        const localVersion = typeof localData?.version === 'string' 
+            ? new Date(localData.version).getTime() 
+            : 0;
         const remoteData = await this.fetchFromGitHub(url);
-        if (!remoteData?.reportedUsers) {
+        if (!remoteData?.reportedUsers || !Array.isArray(remoteData.reportedUsers)) {
             console.log('No valid remote data found.');
             return;
         }
-        let parsedData;
-        try {
-            parsedData = JSON.parse(remoteData.reportedUsers);
-        } catch (error) {
-            console.error('Error parsing reportedUsers JSON:', error);
-            return;
-        }
-        if (!parsedData?.version || !parsedData?.reportedUsers) {
-            console.log('Invalid data structure after parsing.');
-            return;
-        }
-        const remoteVersion = parsedData.version;
+        const remoteVersion = new Date(remoteData.version).getTime();
         if (remoteVersion > localVersion) {
             console.log(`Merging from version ${localVersion} to ${remoteVersion}`);
-            const remoteBuckets = new Int32Array(parsedData.reportedUsers);
+            const remoteBuckets = new Int32Array(remoteData.reportedUsers);
     
             if (remoteBuckets.length !== this.buckets.length) {
                 console.warn('Reinitializing buckets due to size mismatch.');
@@ -188,20 +179,20 @@ class BloomFilter {
         } else {
             console.log('Local data is up-to-date. No merge needed.');
         }
-    }
-    
+    }    
+
     // This function gets the current version of the Bloom filter.
     static async getVersion(key) {
         const result = await browser.storage.local.get(key);
         if (result[key]) {
             try {
                 const parsedData = JSON.parse(result[key]);
-                return parsedData.version || 0;
+                return parsedData.version || "0";
             } catch (e) {
                 console.error('Error parsing stored data:', e);
-                return 0;
+                return "0";
             }
         }
-        return 0;
+        return "0";
     }
 }

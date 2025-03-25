@@ -19,12 +19,9 @@ browser.runtime.sendMessage({ type: "getCommenter" }).then(async (response) => {
         await window.bloomFilter.save('reportedUsers', currentVersion);
         alert("User added to reports.");
 
-        // Hash the ID
-        const hashedID = window.bloomFilter.fnv1aHash(response.profile_ID).toString();
-
         // Prepare the load to send
         const load = {
-            reports: [hashedID]
+            reports: [response.profile_ID]
         };
 
         try {
