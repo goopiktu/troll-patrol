@@ -1,3 +1,6 @@
+// Track already blurred users
+const blurredUsers = new Set();
+
 document.addEventListener("contextmenu", (event) => {
     let profileLinkElement = event.target.closest("a[href*='facebook.com/']");
 
@@ -61,17 +64,15 @@ function highlightReportedUsers() {
         let commenterProfile = extractFacebookProfileID(profileHref);
         if (!commenterProfile) return;
 
-        if (window.bloomFilter.check(commenterProfile)) {
-            if (!comment.classList.contains("blurred")) {
-                console.log("Blurring comment by reported user:", commenterProfile);
+        if (window.bloomFilter.check(commenterProfile) && !blurredUsers.has(commenterProfile)) {
+            blurredUsers.add(commenterProfile);
 
-                if (nameElement !== null) {
-                    blurContainer(comment, nameElement, nameElement.innerText || "Unknown User");
-                } else {
-                    let postAncestor = getFurthestAncestor(profileLink, 15);
-                    if (postAncestor) {
-                        blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster");
-                    }
+            if (nameElement !== null) {
+                blurContainer(comment, nameElement, nameElement.innerText || "Unknown User");
+            } else {
+                let postAncestor = getFurthestAncestor(profileLink, 15);
+                if (postAncestor) {
+                    blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster");
                 }
             }
         }
@@ -88,28 +89,29 @@ function highlightReportedUsers() {
         let profileID = extractFacebookProfileID(href);
         if (!profileID) return;
 
-        if (window.bloomFilter.check(profileID)) {
+        if (window.bloomFilter.check(profileID) && !blurredUsers.has(profileID)) {
+            blurredUsers.add(profileID);
+
             let ancestor = getFurthestAncestor(element, 15);
             if (ancestor && !ancestor.classList.contains("blurred")) {
-                console.log("Blurring profile post by reported user:", profileID);
                 blurContainer(ancestor, element, displayName);
             }
         }
     });
 }
 
-// Blur handler
 function blurContainer(container, nameElement, displayName) {
-    // Prevent re-processing if already blurred
-    if (container.classList.contains("blurred") || container.querySelector(".troll-blur-wrapper")) return;
+    // Prevent re-processing
+    if (container.dataset.trollBlurred === "true" || container.querySelector(".troll-blur-wrapper")) return;
 
     // Skip blur if the user has unblurred it before
     if (sessionStorage.getItem(`unblurred-${displayName}`) === "true") return;
 
+    container.dataset.trollBlurred = "true";
     container.classList.add("blurred");
-    container.style.position = "relative"; // Ensure correct positioning
+    container.style.position = "relative";
 
-    // Create the blur wrapper (only if not already added)
+    // Create the blur wrapper
     let blurWrapper = document.createElement("div");
     blurWrapper.className = "troll-blur-wrapper";
 
@@ -122,21 +124,22 @@ function blurContainer(container, nameElement, displayName) {
     // Create the overlay
     let overlay = document.createElement("div");
     overlay.className = "troll-overlay";
-    overlay.innerHTML = `<div class="troll-overlay-content">
-                            <span class="troll-label">This Comment might be a Troll</span>
-                            <span class="troll-labal-2">Do you still wish to view?</span>
-                            <button class="troll-unblur-btn">Show</button>
-                         </div>`;
+    overlay.innerHTML = `
+        <div class="troll-overlay-content">
+            <span class="troll-label">This Comment might be a Troll</span>
+            <span class="troll-labal-2">Do you still wish to view?</span>
+            <button class="troll-unblur-btn">Show</button>
+        </div>`;
 
     container.appendChild(overlay);
 
-    // Handle unblur button click
+    // Handle unblur
     overlay.querySelector(".troll-unblur-btn").addEventListener("click", function (e) {
         e.stopPropagation();
-        container.classList.remove("blurred"); // Remove blur class
-        blurWrapper.style.filter = "none"; // Remove blur effect
-        overlay.remove(); // Remove the overlay
-        sessionStorage.setItem(`unblurred-${displayName}`, "true"); // Save unblur state
+        container.classList.remove("blurred");
+        blurWrapper.style.filter = "none";
+        overlay.remove();
+        sessionStorage.setItem(`unblurred-${displayName}`, "true");
     });
 }
 
@@ -159,7 +162,7 @@ const scheduleHighlight = throttle(() => {
     } else {
         highlightReportedUsers();
     }
-}, 200); // Throttle interval (ms)
+}, 200);
 
 // Observe for dynamically loaded content
 const observer = new MutationObserver(() => scheduleHighlight());
