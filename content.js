@@ -1,6 +1,19 @@
 // Track already blurred users
 const blurredUsers = new Set();
 
+// Initialize metrics if not present
+let storedMetrics = localStorage.getItem('trollMetrics');
+let Metrics = storedMetrics ? JSON.parse(storedMetrics) : {
+    totalBlurredEncounters: 0,
+    totalUnblurs: 0
+};
+
+// Save updated metrics
+function saveMetrics() {
+    localStorage.setItem('trollMetrics', JSON.stringify(Metrics));
+}
+
+
 document.addEventListener("contextmenu", (event) => {
     let profileLinkElement = event.target.closest("a[href*='facebook.com/']");
 
@@ -69,7 +82,8 @@ function highlightReportedUsers() {
 
         if (window.bloomFilter.check(commenterProfile) && !blurredUsers.has(commenterProfile)) {
             blurredUsers.add(commenterProfile);
-
+            Metrics.totalBlurredEncounters += 1;
+            saveMetrics();
             if (nameElement !== null) {
                 blurContainer(comment, nameElement, nameElement.innerText || "Unknown User");
             } else {
@@ -164,6 +178,8 @@ function blurContainer(container, nameElement, displayName) {
             container.classList.remove("blurred");
             blurWrapper.style.opacity = "0";
             overlay.style.opacity = "0";
+            Metrics.totalUnblurs += 1;
+            saveMetrics();
         });
 
         document.addEventListener("mouseup", function () {
