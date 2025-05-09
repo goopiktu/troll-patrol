@@ -51,6 +51,9 @@ function highlightReportedUsers() {
         return;
     }
 
+    // Clear existing blurred users (to prevent duplicates)
+    blurredUsers.clear();
+
     // Process posts/comments
     document.querySelectorAll("div[role='article']").forEach((comment) => {
         let nameElement = comment.querySelector("span.x193iq5w");
@@ -101,46 +104,87 @@ function highlightReportedUsers() {
 }
 
 function blurContainer(container, nameElement, displayName) {
-    // Prevent re-processing
-    if (container.dataset.trollBlurred === "true" || container.querySelector(".troll-blur-wrapper")) return;
+    let blurWrapper = container.querySelector(".troll-blur-wrapper");
+    let overlay = container.querySelector(".troll-overlay");
 
-    // Skip blur if the user has unblurred it before
-    if (sessionStorage.getItem(`unblurred-${displayName}`) === "true") return;
+    if (!blurWrapper) {
+        blurWrapper = document.createElement("div");
+        blurWrapper.className = "troll-blur-wrapper";
+        Object.assign(blurWrapper.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(20px)",
+            zIndex: "10",
+            transition: "opacity 0.2s ease",
+            pointerEvents: "none",
+        });
+        container.appendChild(blurWrapper);
+    }
 
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "troll-overlay";
+        Object.assign(overlay.style, {
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: "15",
+            textAlign: "center",
+            color: "#FFFFFF",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            padding: "10px 20px",
+            borderRadius: "8px",
+            backdropFilter: "blur(20px)",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+        });
+        overlay.innerHTML = `
+            <div class="troll-overlay-content">
+                <span class="troll-label">This Comment might be a Troll</span>
+                <br>
+                <span class="troll-label-2">Hold to view</span>
+                <br>
+                <button class="troll-unblur-btn" style="margin-top: 10px; padding: 5px 10px;">Hold to Show</button>
+            </div>`;
+        container.appendChild(overlay);
+
+        // Handle "Hold to Show" functionality — only attach once!
+        const unblurButton = overlay.querySelector(".troll-unblur-btn");
+        let isHolding = false;
+
+        unblurButton.addEventListener("mousedown", function (e) {
+            e.stopPropagation();
+            isHolding = true;
+            container.classList.remove("blurred");
+            blurWrapper.style.opacity = "0";
+            overlay.style.opacity = "0";
+        });
+
+        document.addEventListener("mouseup", function () {
+            if (isHolding) {
+                isHolding = false;
+                container.classList.add("blurred");
+                blurWrapper.style.opacity = "1";
+                overlay.style.opacity = "1";
+            }
+        });
+    }
+
+    // Ensure these are shown on (re-)blur
     container.dataset.trollBlurred = "true";
     container.classList.add("blurred");
-    container.style.position = "relative";
+    blurWrapper.style.opacity = "1";
+    overlay.style.opacity = "1";
 
-    // Create the blur wrapper
-    let blurWrapper = document.createElement("div");
-    blurWrapper.className = "troll-blur-wrapper";
-
-    // Move all children into the blur wrapper
-    while (container.firstChild) {
-        blurWrapper.appendChild(container.firstChild);
-    }
-    container.appendChild(blurWrapper);
-
-    // Create the overlay
-    let overlay = document.createElement("div");
-    overlay.className = "troll-overlay";
-    overlay.innerHTML = `
-        <div class="troll-overlay-content">
-            <span class="troll-label">This Comment might be a Troll</span>
-            <span class="troll-labal-2">Do you still wish to view?</span>
-            <button class="troll-unblur-btn">Show</button>
-        </div>`;
-
-    container.appendChild(overlay);
-
-    // Handle unblur
-    overlay.querySelector(".troll-unblur-btn").addEventListener("click", function (e) {
-        e.stopPropagation();
-        container.classList.remove("blurred");
-        blurWrapper.style.filter = "none";
-        overlay.remove();
-        sessionStorage.setItem(`unblurred-${displayName}`, "true");
-    });
+    // Prevent hover overlay interaction issues
+    blurWrapper.addEventListener("click", (e) => e.stopPropagation());
+    overlay.addEventListener("click", (e) => e.stopPropagation());
 }
 
 // Throttle utility
