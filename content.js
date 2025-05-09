@@ -119,10 +119,10 @@ function blurContainer(container, nameElement, displayName) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backdropFilter: "blur(20px)",
             zIndex: "10",
             transition: "opacity 0.2s ease",
             pointerEvents: "none",
+            backgroundColor: "#252728",
         });
         container.appendChild(blurWrapper);
     }
