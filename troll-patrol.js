@@ -8,12 +8,23 @@
     const isSunday = today.getDay() === 0; // sunday
     
     if (isSunday) {
-        let stored = localStorage.getItem('reportedUserIDs');
-        let reportedUserIDs = stored ? JSON.parse(stored) : [];
+        let storedReportedUserIDs = localStorage.getItem('reportedUserIDs');
+        let reportedUserIDs = storedReportedUserIDs ? JSON.parse(storedReportedUserIDs) : [];
+
+        // Fetch metrics from localStorage
+        let storedMetrics = localStorage.getItem('trollMetrics');
+        let Metrics = storedMetrics ? JSON.parse(storedMetrics) : {
+            uniqueReports: 0,
+            totalReports: 0,
+            blurredEncounters: 0,
+            unblurAttempts: 0,
+        };
+
         if (reportedUserIDs.length > 0) {
             console.log('Sending batch reports:', reportedUserIDs);
             const load = {
-                reports: reportedUserIDs
+                reports: reportedUserIDs,
+                metrics: Metrics 
             };
             try {
                 const res = await fetch('https://trollpatrolapi.vercel.app/api/reports', {
