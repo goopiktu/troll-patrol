@@ -117,13 +117,31 @@ function highlightReportedUsers() {
     });
 }
 
+function isFacebookDarkMode() {
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    return isDarkColor(bgColor);
+}
+
+function isDarkColor(colorStr) {
+    // Extract RGB from "rgb(r, g, b)" or "rgba(r, g, b, a)"
+    const match = colorStr.match(/\d+/g);
+    if (!match) return false;
+
+    const [r, g, b] = match.map(Number);
+    // Perceived brightness formula
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness < 128; // Threshold for "dark"
+}
+
 function blurContainer(container, nameElement, displayName, type = "commenter") {
     let blurWrapper = container.querySelector(".troll-blur-wrapper");
     let overlay = container.querySelector(".troll-overlay");
+    const isDark = isFacebookDarkMode();
 
     if (!blurWrapper) {
         blurWrapper = document.createElement("div");
         blurWrapper.className = "troll-blur-wrapper";
+        blurWrapper.style.backgroundColor = isDark ? "#252728" : "#ffffff";
         Object.assign(blurWrapper.style, {
             position: "absolute",
             top: "0",
@@ -136,8 +154,8 @@ function blurContainer(container, nameElement, displayName, type = "commenter") 
             zIndex: "10",
             transition: "opacity 0.2s ease",
             pointerEvents: "none",
-            backgroundColor: "#252728"
         });
+        
         container.appendChild(blurWrapper);
     }
 
