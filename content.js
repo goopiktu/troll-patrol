@@ -25,13 +25,16 @@ document.addEventListener("contextmenu", (event) => {
         console.log("Right-clicked Profile ID:", profileID);
         console.log("Display Name:", displayName);
 
-        if (profileID) {
-            browser.runtime.sendMessage({
-                type: "storeCommenter",
-                profile_ID: profileID,
-                display_name: displayName
-            });
-        }
+        browser.runtime.sendMessage({
+        type: "storeCommenter",
+        profile_ID: profileID,
+        display_name: displayName
+        }).then(response => {
+            if (response?.status === "stored") {
+                console.log(`Profile ${response.profile_ID} stored, re-blurring...`);
+                highlightReportedUsers();
+            }
+        });
     }
 });
 
@@ -131,7 +134,7 @@ function blurContainer(container, nameElement, displayName, type = "commenter") 
             alignItems: "center",
             justifyContent: "center",
             zIndex: "10",
-            transition: "none", // ← Removed transition for instant display
+            transition: "opacity 0.2s ease",
             pointerEvents: "none",
             backgroundColor: "#252728"
         });
