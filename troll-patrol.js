@@ -5,43 +5,42 @@
     await bloomFilter.updateFromGitHub(`https://raw.githubusercontent.com/ramonmapua/troll_patrol_filters/main/bloomfilter-${todayISO}.json`);
     console.log('Bloom Filter loaded.');
     const today = new Date();
-    const isSunday = today.getDay() === 0; // sunday
-    
+    const isSunday = today.getDay() === 0;
     if (isSunday) {
-        let storedReportedUserIDs = localStorage.getItem('reportedUserIDs');
-        let reportedUserIDs = storedReportedUserIDs ? JSON.parse(storedReportedUserIDs) : [];
-
-        // Fetch metrics from localStorage
-        let storedMetrics = localStorage.getItem('trollMetrics');
-        let Metrics = storedMetrics ? JSON.parse(storedMetrics) : {
-            uniqueReports: 0,
-            totalReports: 0,
-            blurredEncounters: 0,
-            unblurAttempts: 0,
-        };
-
-        if (reportedUserIDs.length > 0) {
-            console.log('Sending batch reports:', reportedUserIDs);
-            const load = {
-                reports: reportedUserIDs,
-                metrics: Metrics 
-            };
+        const storedReportedUserIDs = JSON.parse(localStorage.getItem('reportedUserIDs') || '[]');
+        if (storedReportedUserIDs.length > 0) {
             try {
                 const res = await fetch('https://trollpatrolapi.vercel.app/api/reports', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(load)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reports: storedReportedUserIDs })
                 });
-                if (!res.ok) {
-                    throw new Error(`Server responded with ${res.status}`);
+                if (res.ok) {
+                    console.log('Reports sent.');
+                    localStorage.removeItem('reportedUserIDs');
+                } else {
+                    console.error('Report upload failed with status', res.status);
                 }
-                const result = await res.json();
-                console.log('Batch report sent successfully:', result);
-                localStorage.removeItem('reportedUserIDs');
-            } catch (error) {
-                console.error('Error submitting weekly report:', error);
+            } catch (err) {
+                console.error('Failed to upload reports:', err);
+            }
+        }
+        const storedMetrics = JSON.parse(localStorage.getItem('trollMetrics') || '{}');
+        if (Object.keys(storedMetrics).length > 0) {
+            try {
+                const res = await fetch('https://trollpatrolapi.vercel.app/api/metrics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(storedMetrics)
+                });
+                if (res.ok) {
+                    console.log('Metrics sent.');
+                    localStorage.removeItem('trollMetrics');
+                } else {
+                    console.error('Metric upload failed with status', res.status);
+                }
+            } catch (err) {
+                console.error('Failed to upload metrics:', err);
             }
         }
     }
