@@ -64,10 +64,8 @@ function highlightReportedUsers() {
         return;
     }
 
-    // Clear existing blurred users (to prevent duplicates)
     blurredUsers.clear();
 
-    // Process posts/comments
     document.querySelectorAll("div[role='article']").forEach((comment) => {
         let nameElement = comment.querySelector("span.x193iq5w");
         let profileLink = comment.querySelector("a[href*='facebook.com/']");
@@ -85,17 +83,16 @@ function highlightReportedUsers() {
             Metrics.totalBlurredEncounters += 1;
             saveMetrics();
             if (nameElement !== null) {
-                blurContainer(comment, nameElement, nameElement.innerText || "Unknown User");
+                blurContainer(comment, nameElement, nameElement.innerText || "Unknown User", "commenter");
             } else {
                 let postAncestor = getFurthestAncestor(profileLink, 15);
                 if (postAncestor) {
-                    blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster");
+                    blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster", "poster");
                 }
             }
         }
     });
 
-    // Process profile name elements (e.g. ads, posts)
     document.querySelectorAll('[data-ad-rendering-role="profile_name"]').forEach((element) => {
         const displayName = element.innerText || element.textContent;
         const linkElement = element.querySelector('a');
@@ -111,13 +108,13 @@ function highlightReportedUsers() {
 
             let ancestor = getFurthestAncestor(element, 15);
             if (ancestor && !ancestor.classList.contains("blurred")) {
-                blurContainer(ancestor, element, displayName);
+                blurContainer(ancestor, element, displayName, "poster");
             }
         }
     });
 }
 
-function blurContainer(container, nameElement, displayName) {
+function blurContainer(container, nameElement, displayName, type = "commenter") {
     let blurWrapper = container.querySelector(".troll-blur-wrapper");
     let overlay = container.querySelector(".troll-overlay");
 
@@ -134,9 +131,9 @@ function blurContainer(container, nameElement, displayName) {
             alignItems: "center",
             justifyContent: "center",
             zIndex: "10",
-            transition: "opacity 0.2s ease",
+            transition: "none", // ← Removed transition for instant display
             pointerEvents: "none",
-            backgroundColor: "#252728",
+            backgroundColor: "#252728"
         });
         container.appendChild(blurWrapper);
     }
@@ -156,11 +153,16 @@ function blurContainer(container, nameElement, displayName) {
             padding: "10px 20px",
             borderRadius: "8px",
             backdropFilter: "blur(20px)",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)"
         });
+
+        const labelText = type === "poster"
+            ? "This Post might be from a Troll"
+            : "This Comment might be a Troll";
+
         overlay.innerHTML = `
             <div class="troll-overlay-content">
-                <span class="troll-label">This Comment might be a Troll</span>
+                <span class="troll-label">${labelText}</span>
                 <br>
                 <span class="troll-label-2">Hold to view</span>
                 <br>
@@ -168,7 +170,6 @@ function blurContainer(container, nameElement, displayName) {
             </div>`;
         container.appendChild(overlay);
 
-        // Handle "Hold to Show" functionality — only attach once!
         const unblurButton = overlay.querySelector(".troll-unblur-btn");
         let isHolding = false;
 
@@ -192,13 +193,13 @@ function blurContainer(container, nameElement, displayName) {
         });
     }
 
-    // Ensure these are shown on (re-)blur
+    // Ensure blur is applied instantly
     container.dataset.trollBlurred = "true";
     container.classList.add("blurred");
     blurWrapper.style.opacity = "1";
     overlay.style.opacity = "1";
 
-    // Prevent hover overlay interaction issues
+    // Prevent interaction issues
     blurWrapper.addEventListener("click", (e) => e.stopPropagation());
     overlay.addEventListener("click", (e) => e.stopPropagation());
 }
