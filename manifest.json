@@ -3,7 +3,7 @@
     "name": "troll-patrol",
     "version": "1.0",
   
-    "description": "Adds a red border to all webpages matching mozilla.org.",
+    "description": "Adds a blur overlay to the reported users/posters of facebook",
 
     "permissions": ["contextMenus", "activeTab", "tabs", "clipboardWrite", "scripting", "storage", "downloads", "https://raw.githubusercontent.com/*", "https://trollpatrolapi.vercel.app/api/reports"],
 
@@ -12,7 +12,7 @@
     },
 
     "icons": {
-      "48": "icons/border-48.png"
+      "48": "icons/logo.png"
     },
     
     "content_scripts": [

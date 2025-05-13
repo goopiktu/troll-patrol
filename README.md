@@ -16,4 +16,4 @@ Instruction on running:
 web-ext run
 ```
 
-2. should be able to go to facebook.com and see a red boarder
+2. should be able to go to facebook.com and start reporting users.
