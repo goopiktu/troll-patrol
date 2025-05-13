@@ -4,9 +4,15 @@
     const todayISO = new Date().toISOString().split('T')[0];
     await bloomFilter.updateFromGitHub(`https://raw.githubusercontent.com/ramonmapua/troll_patrol_filters/main/bloomfilter-${todayISO}.json`);
     console.log('Bloom Filter loaded.');
-    const today = new Date();
-    const isSunday = today.getDay() === 0;
-    if (isSunday) {
+
+    const now = new Date();
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 0, 0);
+    const timeUntilEndOfDay = endOfDay - now;
+
+    setTimeout(async () => {
+        console.log('Sending reports and metrics at the end of the day.');
+
         const storedReportedUserIDs = JSON.parse(localStorage.getItem('reportedUserIDs') || '[]');
         if (storedReportedUserIDs.length > 0) {
             try {
@@ -25,6 +31,7 @@
                 console.error('Failed to upload reports:', err);
             }
         }
+
         const storedMetrics = JSON.parse(localStorage.getItem('trollMetrics') || '{}');
         if (Object.keys(storedMetrics).length > 0) {
             try {
@@ -43,5 +50,6 @@
                 console.error('Failed to upload metrics:', err);
             }
         }
-    }
+    }, timeUntilEndOfDay);
+
 })();
