@@ -22,12 +22,16 @@
 
         const storedReportedUserIDs = JSON.parse(localStorage.getItem('reportedUserIDs') || '[]');
         if (storedReportedUserIDs.length > 0) {
+            const requestBody = JSON.stringify({ reports: storedReportedUserIDs });
+            console.log('Sending reports:', requestBody);
+
             try {
                 const res = await fetch('https://trollpatrolapi.vercel.app/api/reports', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reports: storedReportedUserIDs })
+                    body: requestBody
                 });
+
                 if (res.ok) {
                     console.log('Reports sent successfully.');
                     localStorage.removeItem('reportedUserIDs');
@@ -71,9 +75,10 @@
         const now = new Date();
         const hour = now.getHours();
         
-        // Only send reports if it's not between 11 PM and 12 AM
+    // Only send reports if it's not between 11 PM and 12 AM
+        console.log('Current hour:', hour, 'Reports sent today?', reportsSentToday());
         if (hour < 23  && !reportsSentToday()) {
             sendReportsAndMetrics();
         }
-    }, 60 * 60 * 1000); // Checks every 1 hr
+    }, 2 * 60 * 1000); // Checks every 2 min
 })();
