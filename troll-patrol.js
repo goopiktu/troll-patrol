@@ -5,6 +5,12 @@
     await bloomFilter.updateFromGitHub(`https://raw.githubusercontent.com/ramonmapua/troll_patrol_filters/main/bloomfilter-${todayISO}.json`);
     console.log('Bloom Filter loaded.');
 
+    // uncomment if reportsSentToday is True
+
+    // const yesterday = new Date();
+    // yesterday.setDate(yesterday.getDate() - 1);
+    // localStorage.setItem('lastReportSentDate', yesterday.toISOString().split('T')[0]);
+
     // Function to check if reports were sent today
     function reportsSentToday() {
         const lastSentDate = localStorage.getItem('lastReportSentDate');
@@ -23,7 +29,7 @@
         const storedReportedUserIDs = JSON.parse(localStorage.getItem('reportedUserIDs') || '[]');
         if (storedReportedUserIDs.length > 0) {
             const requestBody = JSON.stringify({ reports: storedReportedUserIDs });
-            console.log('Sending reports:', requestBody);
+            // console.log('Sending IDS:', requestBody);
 
             try {
                 const res = await fetch('https://trollpatrolapi.vercel.app/api/reports', {
@@ -47,11 +53,13 @@
 
         const storedMetrics = JSON.parse(localStorage.getItem('trollMetrics') || '{}');
         if (Object.keys(storedMetrics).length > 0) {
+            const requestBody = JSON.stringify({ reports: storedMetrics })
+            // console.log('Sending metrics:', requestBody);
             try {
                 const res = await fetch('https://trollpatrolapi.vercel.app/api/metrics', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(storedMetrics)
+                    body: requestBody
                 });
                 if (res.ok) {
                     console.log('Metrics sent successfully.');
@@ -69,7 +77,7 @@
         // Mark today's date as sent
         localStorage.setItem('lastReportSentDate', new Date().toISOString().split('T')[0]);
     }
-
+    
     // Schedule to send reports automatically (excludes 11 PM - 12 AM)
     setInterval(() => {
         const now = new Date();
@@ -80,5 +88,5 @@
         if (hour < 23  && !reportsSentToday()) {
             sendReportsAndMetrics();
         }
-    }, 2 * 60 * 1000); // Checks every 2 min
+    }, 60 * 1000); // Checks every 1 min
 })();
