@@ -117,6 +117,88 @@ function highlightReportedUsers() {
     });
 }
 
+function injectReportButtons() {
+    const classList = [
+        "x9f619", "x1ja2u2z", "x78zum5", "x2lah0s", "x1n2onr6", "x1qughib", "x1qjc9v5",
+        "xozqiw3", "x1q0g3np", "xjkvuk6", "x1iorvi4", "xwrv7xz", "x8182xy", "x4cne27", "xifccgj"
+    ];
+
+    // Find all parent containers
+    const containers = Array.from(document.querySelectorAll('div.xq8finb.x16n37ib'));
+
+    containers.forEach(container => {
+        // Find the inner child with the exact full class list
+        const matchingChild = Array.from(container.querySelectorAll("div")).find(child =>
+            classList.every(cls => child.classList.contains(cls))
+        );
+
+        // Skip if no match or button already added
+        if (!matchingChild || matchingChild.querySelector(".custom-troll-button")) return;
+
+        const button = document.createElement("button");
+        button.className = "custom-troll-button";
+        button.innerText = "🚩Flag 🧌";
+
+        Object.assign(button.style, {
+            marginTop: "8px",
+            marginBottom: "8px",
+            cursor: "pointer",
+            padding: "4px 8px",
+            borderRadius: "6px",
+            backgroundColor: "#f0f0f0",
+            color: "#111",
+            fontWeight: "500",
+            fontSize: "14px",
+            border: "none",
+            display: "flex"
+        });
+
+        button.addEventListener("click", () => {
+            // Start from the button and walk up to find the post container
+            const postAncestor = getFurthestAncestor(button, 15);
+
+            if (!postAncestor) return;
+
+            // Now find the profile link somewhere within this post/comment
+            const profileLink = postAncestor.querySelector("a[href*='facebook.com/']");
+
+            if (!profileLink) {
+                console.warn("No profile link found within ancestor.");
+                return;
+            }
+
+            const profileHref = profileLink.getAttribute("href");
+            const profileID = extractFacebookProfileID(profileHref);
+            if (!profileID) return;
+
+            let displayName = profileLink.querySelector("span, div span")?.innerText?.trim() || profileLink.innerText?.trim() || "Unknown";
+
+
+            console.log("Report clicked for profileID:", profileID);
+            console.log("Display name:", displayName);
+
+            blurContainer(postAncestor, profileLink, displayName, "poster");
+
+            // Optionally send the user info to storage too
+            browser.runtime.sendMessage({
+                type: "storeCommenter",
+                profile_ID: profileID,
+                display_name: displayName
+            }).then(response => {
+                if (response?.status === "stored") {
+                    highlightReportedUsers();
+                }
+            });
+        });
+
+
+        // Append the button INSIDE the inner container
+        matchingChild.appendChild(button);
+    });
+}
+
+
+
 function isFacebookDarkMode() {
     const bgColor = window.getComputedStyle(document.body).backgroundColor;
     return isDarkColor(bgColor);
@@ -225,6 +307,9 @@ function blurContainer(container, nameElement, displayName, type = "commenter") 
     overlay.addEventListener("click", (e) => e.stopPropagation());
 }
 
+
+
+
 // Throttle utility
 function throttle(fn, wait) {
     let timer = null;
@@ -237,18 +322,39 @@ function throttle(fn, wait) {
     };
 }
 
-// Schedule highlight function
+// Throttled scheduling
 const scheduleHighlight = throttle(() => {
+    const runner = () => {
+        highlightReportedUsers(); // Handles styling/reactions for reported users only
+    };
+
     if ('requestIdleCallback' in window) {
-        requestIdleCallback(highlightReportedUsers);
+        requestIdleCallback(runner);
     } else {
-        highlightReportedUsers();
+        runner();
     }
 }, 200);
 
-// Observe for dynamically loaded content
-const observer = new MutationObserver(() => scheduleHighlight());
+const scheduleButtonInjection = throttle(() => {
+    const runner = () => {
+        injectReportButtons(); // Always injects buttons regardless of user state
+    };
+
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(runner);
+    } else {
+        runner();
+    }
+}, 200);
+
+// Observe for dynamic content
+const observer = new MutationObserver(() => {
+    scheduleHighlight();
+    scheduleButtonInjection(); // Scheduled separately
+});
 observer.observe(document.body, { childList: true, subtree: true });
 
 // Initial run on page load
+injectReportButtons();
 highlightReportedUsers();
+
