@@ -6,8 +6,8 @@ let storedMetrics = localStorage.getItem('trollMetrics');
 let Metrics = storedMetrics ? JSON.parse(storedMetrics) : {
     uniqueReports: 0,
     totalReports: 0,
-    totalBlurredEncounters: 0,
-    totalUnblurs: 0
+    blurredEncounters: 0,
+    unblurAttempts: 0
 };
 
 function storeReportedUserID(profileID) {
@@ -92,7 +92,7 @@ function highlightReportedUsers() {
 
         if (window.bloomFilter.check(profileID) && !blurredUsers.has(profileID)) {
             blurredUsers.add(profileID);
-            Metrics.totalBlurredEncounters += 1;
+            Metrics.blurredEncounterss += 1;
             saveMetrics();
 
             // Instead of trusting 'element', find a solid container to blur
@@ -343,7 +343,7 @@ function blurContainer(container, nameElement, displayName, type = "commenter") 
             container.classList.remove("blurred");
             blurWrapper.style.opacity = "0";
             overlay.style.opacity = "0";
-            Metrics.totalUnblurs += 1;
+            Metrics.unblurAttempts += 1;
             saveMetrics();
         });
 
