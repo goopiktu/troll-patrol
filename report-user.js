@@ -7,7 +7,7 @@ browser.runtime.sendMessage({ type: "getCommenter" }).then(async (response) => {
             uniqueReports: 0,
             totalReports: 0,
             blurredEncounters: 0,
-            unblurAttempts: 0
+            totalUnblurs: 0
         }));
 
         if (!reportedUserIDs.includes(response.profile_ID)) {

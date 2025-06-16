@@ -4,9 +4,19 @@ const blurredUsers = new Set();
 // Initialize metrics if not present
 let storedMetrics = localStorage.getItem('trollMetrics');
 let Metrics = storedMetrics ? JSON.parse(storedMetrics) : {
+    uniqueReports: 0,
+    totalReports: 0,
     totalBlurredEncounters: 0,
     totalUnblurs: 0
 };
+
+function storeReportedUserID(profileID) {
+    const existing = JSON.parse(localStorage.getItem('reportedUserIDs') || '[]');
+    if (!existing.includes(profileID)) {
+        existing.push(profileID);
+        localStorage.setItem('reportedUserIDs', JSON.stringify(existing));
+    }
+}
 
 // Save updated metrics
 function saveMetrics() {
@@ -69,33 +79,40 @@ function highlightReportedUsers() {
 
     blurredUsers.clear();
 
-    document.querySelectorAll("div[role='article']").forEach((comment) => {
-        let nameElement = comment.querySelector("span.x193iq5w");
-        let profileLink = comment.querySelector("a[href*='facebook.com/']");
-
+    // Handle comments and posts that look like articles
+    document.querySelectorAll("div[role='article']").forEach((element) => {
+        let profileLink = element.querySelector("a[href*='facebook.com/']");
         if (!profileLink) return;
 
         let profileHref = profileLink.getAttribute("href");
         if (!profileHref) return;
 
-        let commenterProfile = extractFacebookProfileID(profileHref);
-        if (!commenterProfile) return;
+        let profileID = extractFacebookProfileID(profileHref);
+        if (!profileID) return;
 
-        if (window.bloomFilter.check(commenterProfile) && !blurredUsers.has(commenterProfile)) {
-            blurredUsers.add(commenterProfile);
+        if (window.bloomFilter.check(profileID) && !blurredUsers.has(profileID)) {
+            blurredUsers.add(profileID);
             Metrics.totalBlurredEncounters += 1;
             saveMetrics();
-            if (nameElement !== null) {
-                blurContainer(comment, nameElement, nameElement.innerText || "Unknown User", "commenter");
+
+            // Instead of trusting 'element', find a solid container to blur
+            let stableAncestor = getFurthestAncestor(profileLink, 20);
+            if (stableAncestor) {
+                const displayName = profileLink.innerText || "Unknown User";
+                blurContainer(stableAncestor, profileLink, displayName, "commenter");
+                console.log("✅ Blurred commenter container:", stableAncestor);
             } else {
+                // Fallback for posts
                 let postAncestor = getFurthestAncestor(profileLink, 15);
                 if (postAncestor) {
                     blurContainer(postAncestor, profileLink, profileLink.innerText || "Unknown Poster", "poster");
+                    console.log("⚠️ Fallback to poster blur:", postAncestor);
                 }
             }
         }
     });
 
+    // Handle posts via sponsored/profile_name container
     document.querySelectorAll('[data-ad-rendering-role="profile_name"]').forEach((element) => {
         const displayName = element.innerText || element.textContent;
         const linkElement = element.querySelector('a');
@@ -112,91 +129,135 @@ function highlightReportedUsers() {
             let ancestor = getFurthestAncestor(element, 15);
             if (ancestor && !ancestor.classList.contains("blurred")) {
                 blurContainer(ancestor, element, displayName, "poster");
+                console.log("✅ Blurred poster container:", ancestor);
             }
         }
     });
 }
 
+
+// The problem that im encountering with mobile implementation is that you don't have the same way of 
+// selecting things the same way you can with desktop
 function injectReportButtons() {
-    const classList = [
-        "x9f619", "x1ja2u2z", "x78zum5", "x2lah0s", "x1n2onr6", "x1qughib", "x1qjc9v5",
-        "xozqiw3", "x1q0g3np", "xjkvuk6", "x1iorvi4", "xwrv7xz", "x8182xy", "x4cne27", "xifccgj"
+    const postContainerClassList = [
+        "x9f619", "x1ja2u2z", "x78zum5", "x2lah0s", "x1n2onr6",
+        "x1qughib", "x1qjc9v5", "xozqiw3", "x1q0g3np", "xjkvuk6",
+        "x1iorvi4", "x11lt19s", "xe9ewy2", "x4cne27", "xifccgj"
     ];
 
-    // Find all parent containers
-    const containers = Array.from(document.querySelectorAll('div.xq8finb.x16n37ib'));
+    const postContainers = Array.from(document.querySelectorAll('div.xbmvrgn.x1diwwjn'));
 
-    containers.forEach(container => {
-        // Find the inner child with the exact full class list
+    // Post Flag Buttons
+    postContainers.forEach(container => {
         const matchingChild = Array.from(container.querySelectorAll("div")).find(child =>
-            classList.every(cls => child.classList.contains(cls))
+            postContainerClassList.every(cls => child.classList.contains(cls))
         );
 
-        // Skip if no match or button already added
         if (!matchingChild || matchingChild.querySelector(".custom-troll-button")) return;
 
-        const button = document.createElement("button");
-        button.className = "custom-troll-button";
-        button.innerText = "🚩Flag 🧌";
-
-        Object.assign(button.style, {
-            marginTop: "8px",
-            marginBottom: "8px",
-            cursor: "pointer",
-            padding: "4px 8px",
-            borderRadius: "6px",
-            backgroundColor: "#f0f0f0",
-            color: "#111",
-            fontWeight: "500",
-            fontSize: "14px",
-            border: "none",
-            display: "flex"
-        });
-
-        button.addEventListener("click", () => {
-            // Start from the button and walk up to find the post container
-            const postAncestor = getFurthestAncestor(button, 15);
-
-            if (!postAncestor) return;
-
-            // Now find the profile link somewhere within this post/comment
-            const profileLink = postAncestor.querySelector("a[href*='facebook.com/']");
-
-            if (!profileLink) {
-                console.warn("No profile link found within ancestor.");
-                return;
-            }
-
-            const profileHref = profileLink.getAttribute("href");
-            const profileID = extractFacebookProfileID(profileHref);
-            if (!profileID) return;
-
-            let displayName = profileLink.querySelector("span, div span")?.innerText?.trim() || profileLink.innerText?.trim() || "Unknown";
-
-
-            console.log("Report clicked for profileID:", profileID);
-            console.log("Display name:", displayName);
-
-            blurContainer(postAncestor, profileLink, displayName, "poster");
-
-            // Optionally send the user info to storage too
-            browser.runtime.sendMessage({
-                type: "storeCommenter",
-                profile_ID: profileID,
-                display_name: displayName
-            }).then(response => {
-                if (response?.status === "stored") {
-                    highlightReportedUsers();
-                }
-            });
-        });
-
-
-        // Append the button INSIDE the inner container
+        const button = createTrollFlagButton();
+        button.addEventListener("click", () => handleReportClick(button, "poster"));
         matchingChild.appendChild(button);
+    });
+
+    // Comment Flag Buttons
+    const commentContainers = document.querySelectorAll('div.x1rg5ohu.xxymvpz.x17z2i9w');
+
+    commentContainers.forEach(container => {
+        if (container.querySelector(".custom-troll-button")) return;
+
+        const button = createTrollFlagButton(true);
+        button.addEventListener("click", () => handleReportClick(button, "commenter"));
+        container.appendChild(button);
     });
 }
 
+
+
+
+
+function createTrollFlagButton(isForComment = false) {
+    const button = document.createElement("button");
+    button.className = "custom-troll-button";
+    button.innerText = isForComment ? "🚩" : "🚩Flag 🧌";
+
+    Object.assign(button.style, {
+        marginTop: "8px",
+        marginBottom: "8px",
+        cursor: "pointer",
+        padding: isForComment ? "2px 4px" : "4px 8px" ,
+        borderRadius: "6px",
+        backgroundColor: "#f0f0f0",
+        color: "#111",
+        fontWeight: "500",
+        fontSize: "14px",
+        border: "none",
+        display: "flex"
+    });
+
+    return button;
+}
+
+function handleReportClick(button, type = "poster") {
+    let ancestor;
+    if (type == "poster") {
+        ancestor = getFurthestAncestor(button, 15);
+    } if (type == "commenter") {
+        ancestor = getFurthestAncestor(button, 4);
+    }
+
+    if (!ancestor) return;
+
+
+    const profileLink = ancestor.querySelector("a[href*='facebook.com/']");
+    if (!profileLink) return;
+
+    const profileHref = profileLink.getAttribute("href");
+    const profileID = extractFacebookProfileID(profileHref);
+    if (!profileID) return;
+
+    let displayName = "Unknown";
+
+    // Try getting name from inside the profileLink first
+    const innerNameEl = profileLink.querySelector("a strong, span");
+    if (innerNameEl && innerNameEl.textContent.trim()) {
+        displayName = innerNameEl.textContent.trim();
+    } else {
+        // Fallback: look outside anchor (useful for comment structure)
+        const fallbackEl = ancestor.querySelector("strong span, [class*='x6zurak']");
+        if (fallbackEl && fallbackEl.textContent.trim()) {
+            displayName = fallbackEl.textContent.trim();
+        } else if (profileLink && profileLink.textContent.trim()) {
+            displayName = profileLink.textContent.trim();
+        }
+    }
+
+   
+    blurContainer(ancestor, profileLink, displayName, type);
+
+    console.log("Right-clicked Profile ID:", profileID);
+    console.log("Display Name:", displayName);
+
+    const reported = JSON.parse(localStorage.getItem("reportedUserIDs") || "[]");
+    if (!reported.includes(profileID)) {
+        reported.push(profileID);
+        localStorage.setItem("reportedUserIDs", JSON.stringify(reported));
+    }
+
+   
+    browser.runtime.sendMessage({
+        type: "storeCommenter",
+        profile_ID: profileID,
+        display_name: displayName
+    }).then(response => {
+        if (response?.status === "stored") {
+            console.log(`Profile ${response.profile_ID} stored, re-blurring...`);
+            window.sendReportsAndMetrics(); 
+        }
+        
+    });
+
+}
 
 
 function isFacebookDarkMode() {
